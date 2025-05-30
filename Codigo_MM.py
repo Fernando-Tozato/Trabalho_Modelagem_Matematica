@@ -3,11 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import CubicSpline
-from google.colab import files
 
 # 2️⃣ Fazer upload do arquivo CSV
-uploaded = files.upload()
-df = pd.read_csv(next(iter(uploaded)))
+df = pd.read_csv('data/Power_Consumption_and_Generation_Dataset.csv')
 df.columns = df.columns.str.strip()  # remove espaços nas colunas
 
 # 3️⃣ Filtrar apenas os dados de 23/01/2025
@@ -29,7 +27,7 @@ y_interp = spline(x_interp)  # valores interpolados
 derivada = np.gradient(y, x)
 
 # 7️⃣ Detectar pontos críticos onde variação é muito alta
-limiar = 2 * np.std(derivada)  # 2 vezes o desvio padrão
+limiar = 1.5 * np.std(derivada)  # 2 vezes o desvio padrão
 picos = np.where(np.abs(derivada) > limiar)[0]  # índices com variação crítica
 
 # 8️⃣ Plotar gráficos
