@@ -5,19 +5,29 @@ Como o eixo X é uma sequência de datetimes, decidimos usar uma sequência
 igualmente espaçada para representar os índices dos datetimes.
 
 Entradas:
- - xs: lista de inteiros representando os índices dos datetimes.
+ - xs: sequência igualmente espaçada representando os índices dos datetimes.
  - ys: lista de floats representando os valores correspondentes aos índices.
 """
-class CubicSpline:
-    xs: list[float]
-    ys: list[float]
-    n: int
+class CustomCubicSpline:
+    """
+    Essa classe calcula os coeficientes do spline cúbico e permite a interpolação.
+
+    Como o eixo X é uma sequência de datetimes, decidimos usar uma sequência
+    igualmente espaçada para representar os índices dos datetimes.
+
+    Entradas:
+     - xs: sequência igualmente espaçada representando os índices dos datetimes.
+     - ys: lista de floats representando os valores correspondentes aos índices.
+    """
+    xs: list[float] # Sequência igualmente espaçada representando os índices dos datetimes
+    ys: list[float] # Lista de valores correspondentes aos índices de xs
+    n: int # Número de pontos (tamanho de xs e ys)
     H_I = 1 # Espaçamento entre os pontos no eixo X, constante para simplificar o cálculo (valores de Xi são igualmente espaçados)
-    deltas_y: list[float] = []
+    deltas_y: list[float] = [] # Lista de diferenças entre os valores de ys consecutivos (deltas_y[i] = ys[i+1] - ys[i])
     SUPER_DIAGONAL: int = 1  # Super diagonal da matriz do sistema, constante para simplificar o cálculo (gerado a partir de H_I)
     MAIN_DIAGONAL: int = 4 # Diagonal principal da matriz do sistema, constante para simplificar o cálculo (gerado a partir de H_I)
     SUB_DIAGONAL: int = 1 # Sub diagonal da matriz do sistema, constante para simplificar o cálculo (gerado a partir de H_I)
-    independent_terms_vector: list[float] = []
+    independent_terms_vector: list[float] = [] # Vetor de termos independentes do sistema de equações
     c_prime: list[float] # Coeficientes c' do spline cúbico
     d_prime: list[float] # Coeficientes d' do spline cúbico
     c_internal: list[float] # Coeficientes c interno do spline cúbico
@@ -28,6 +38,11 @@ class CubicSpline:
     coef_d: list[float] = []  # Coeficientes d do spline cúbico
 
     def __init__(self, xs: list[float], ys: list[float]):
+        """
+        Inicializa o objeto CubicSpline com os valores de xs e ys.
+        :param xs:
+        :param ys:
+        """
         self.xs = xs
         self.ys = ys
 
@@ -61,7 +76,11 @@ class CubicSpline:
             )
 
 
-    def inputs_are_not_valid(self):
+    def inputs_are_not_valid(self) -> bool:
+        """
+        Verifica se os inputs xs e ys são válidos.
+        :return: True se os inputs não forem válidos, False caso contrário.
+        """
         if len(self.xs) != len(self.ys):
             return True
         return False
@@ -94,6 +113,10 @@ class CubicSpline:
     Dessa forma, o coeficiente c interno é calculado de forma eficiente, evitando a necessidade de resolver o sistema de equações diretamente.
     """
     def solve_equation_system(self):
+        """
+        Resolve o sistema de equações para encontrar os coeficientes c' e d' do spline cúbico.
+        :return:
+        """
         n_eq = self.n - 2
 
         self.c_prime = [0.0] * n_eq
@@ -106,8 +129,6 @@ class CubicSpline:
 #       -- Eliminação direta --
         self.c_prime[0] = self.SUPER_DIAGONAL / self.MAIN_DIAGONAL
         self.d_prime[0] = self.independent_terms_vector[0] / self.MAIN_DIAGONAL
-
-        # Equações restantes
         for i in range(1, n_eq):
             denom = self.MAIN_DIAGONAL - self.SUB_DIAGONAL * self.c_prime[i - 1]
             self.c_prime[i] = self.SUPER_DIAGONAL / denom
@@ -118,11 +139,11 @@ class CubicSpline:
         for i in range(n_eq - 2, -1, -1):
             self.c_internal[i] = self.d_prime[i] - self.c_prime[i] * self.c_internal[i + 1]
 
-    def interpolated_function(self, x: float) -> float:
+    def verify_input_and_return_dx_i(self, x: float) -> tuple[float, int]:
         """
-        Calcula o valor interpolado para um dado x usando os coeficientes do spline cúbico.
-        :param x: Valor de x para o qual se deseja calcular o valor interpolado.
-        :return: Valor interpolado correspondente a x.
+        Verifica se o valor de x está dentro do intervalo de xs e retorna o valor de dx e o índice correspondente.
+        :param x: Valor de x para o qual se deseja calcular o índice.
+        :return: (Valor de dx, Índice correspondente a x).
         """
         if x < self.xs[0] or x > self.xs[-1]:
             raise ValueError("x must be within the range of xs.")
@@ -132,8 +153,73 @@ class CubicSpline:
         else:
             i = int(x)
 
-        dx = x - i
+        return x - i, i
+
+    def interpolated_function(self, x: float) -> float:
+        """
+        Calcula o valor interpolado para um dado x usando os coeficientes do spline cúbico.
+        :param x: Valor de x para o qual se deseja calcular o valor interpolado.
+        :return: Valor interpolado correspondente a x.
+        """
+        dx, i = self.verify_input_and_return_dx_i(x)
+
+        # Função cúbica: a + b*dx + c*dx² + d*dx³
         return (self.coef_a[i] +
                 self.coef_b[i] * dx +
                 self.coef_c[i] * dx**2 +
                 self.coef_d[i] * dx**3)
+
+    def derivative(self, x: float) -> float:
+        """
+        Calcula a derivada da função interpolada em um ponto x.
+        :param x: Ponto onde calcular a derivada
+        :return: Valor da derivada em x
+        """
+        dx, i = self.verify_input_and_return_dx_i(x)
+
+        # Derivada da função cúbica: b + 2c*dx + 3d*dx²
+        return (self.coef_b[i] +
+                2 * self.coef_c[i] * dx +
+                3 * self.coef_d[i] * dx**2)
+
+    def find_critical_points(self, num_points=1000) -> list[tuple[any, float, str]]:
+        """
+        Identifica pontos críticos (máximos/mínimos locais) na curva interpolada.
+
+        :param num_points: Número de pontos para amostrar a curva
+        :return: Lista de tuplas (x, y) com pontos críticos
+        """
+        critical_points = []
+
+        # Gerar pontos densamente espaçados
+        x_min, x_max = self.xs[0], self.xs[-1]
+        x_vals = [x_min + i * (x_max - x_min) / num_points for i in range(num_points)]
+        y_vals = [self.interpolated_function(x) for x in x_vals]
+        dy_vals = [self.derivative(x) for x in x_vals]
+
+        # Identificar mudanças de sinal na derivada
+        for i in range(1, num_points):
+            if dy_vals[i-1] * dy_vals[i] < 0:  # Mudança de sinal na derivada
+                # Refinar busca pelo zero exato
+                x_left = x_vals[i-1]
+                x_right = x_vals[i]
+
+                # Método da bisseção para encontrar raiz
+                tolerance = 1e-6
+                while x_right - x_left > tolerance:
+                    mid = (x_left + x_right) / 2
+                    if self.derivative(mid) * self.derivative(x_left) < 0:
+                        x_right = mid
+                    else:
+                        x_left = mid
+
+                x_crit = (x_left + x_right) / 2
+                y_crit = self.interpolated_function(x_crit)
+
+                # Determinar tipo de ponto crítico
+                if dy_vals[i - 1] > 0 > dy_vals[i]:  # Máximo local
+                    critical_points.append((x_crit, y_crit, 'max'))
+                else:  # Mínimo local
+                    critical_points.append((x_crit, y_crit, 'min'))
+
+        return critical_points
