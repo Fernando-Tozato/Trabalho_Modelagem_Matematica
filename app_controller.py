@@ -44,7 +44,7 @@ class AppController:
     def __init__(self):
         self.cui = ConsoleUserInterface()
 
-        self.data = pd.read_csv('../data/Power_Consumption_and_Generation_Dataset.csv')
+        self.data = pd.read_csv('data/Power_Consumption_and_Generation_Dataset.csv')
         self.data.columns = self.data.columns.str.strip()
         self.data['Timestamp'] = pd.to_datetime(self.data['Timestamp'])
 
